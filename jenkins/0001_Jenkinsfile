@@ -1,1 +1,36 @@
-echo "works"
+nodes = ["docker-1-slave", 
+		 "docker-2-slave", 
+		 "ui-slave-1", 
+		 "ui-slave-2", 
+		 "api-slave-1", 
+		 "api-slave-2"]
+
+dockerImageName = ""
+cmdSendAlert = "curl --silent -X POST -d '{\"message\": \"'\"Build failed: $JOB_NAME #$BUILD_NUMBER \"'\", \"description\": \"'\"$BUILD_URL\"'\", \"alias\" : \"'\"$JOB_NAME\"'\", \"priority\": \"P1\"}' -H \"Authorization: GenieKey API_KEY\" -H \"Content-Type: application/json\" https://api.opsgenie.com/v2/alerts"
+
+def execJob = { nodeName ->
+	node(nodeName) {
+		try {
+			sh "docker pull dockerImageName"
+		} catch (e) {
+			sleep 10
+			try {
+				sh "docker pull dockerImageName"
+			} catch (e2) {
+				currentBuild.result = "FAILED"
+				sh script: cmdSendAlert, returnStdout: true
+			}
+		}
+		
+		if (currentBuild.result != "FAILED") {
+			sh "docker rmi ${dockerImageName}"
+		}
+	}
+}
+
+execInParallel = [:]
+nodes.each {
+    execInParallel[it] = { execJob it }	
+}
+
+parallel execInParallel
